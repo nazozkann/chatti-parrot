@@ -1,26 +1,26 @@
 @import "tailwindcss";
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Quicksand:wght@500;600;700&display=swap");
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+  /* renkler */
+  --color-bg: #252424; /* arka plan */
+  --color-fg: #f4f2f2; /* birincil yazı */
+  --color-muted: #6e6e6e; /* ikincil/metin */
+  --color-accent: #ff7f50; /* turuncu accent (CTA) */
+  --color-accent-soft: #ffb347; /* yumuşak turuncu */
+  --color-surface: #333232; /* kart/ yüzey */
+  --color-line: #3c3b3b; /* sınır/ayırıcı */
+  --color-hover: #3b3b3b; /* hover yüzeyi */
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* yazı tipleri (token) */
+  --font-sans: Inter, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji",
+    "Segoe UI Symbol", sans-serif;
+  --font-display: Quicksand, var(--font-sans);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
 }
