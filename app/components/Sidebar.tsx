@@ -5,7 +5,7 @@ export type SidebarMenuItem = {
 
 export const SIDEBAR_MENU_ITEMS: SidebarMenuItem[] = [
   { label: "Timeline", href: "/timeline" },
-  { label: "Word Cards", href: "/word-cards" },
+  { label: "Vocabulary", href: "/vocabulary" },
   { label: "Grammar Exercises", href: "/grammar-exercises" },
   { label: "Reading", href: "/reading" },
   { label: "Speaking", href: "/speaking" },

@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "seed": "ts-node src/scripts/seed.ts"
+    "seed:numbers": "tsx scripts/seed-numbers.ts",
+    "seed:greetings": "tsx scripts/seed-greetings.ts"
   },
   "dependencies": {
     "@auth/mongodb-adapter": "^3.10.0",
@@ -36,6 +37,8 @@
     "eslint": "^9",
     "eslint-config-next": "15.5.3",
     "tailwindcss": "^4",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.20.5",
     "typescript": "^5"
   }
 }
