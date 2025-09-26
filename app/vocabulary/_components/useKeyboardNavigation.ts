@@ -11,6 +11,18 @@ export function useKeyboardNavigation(
     if (!enabled) return;
 
     function handleKeyDown(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      const tagName = target?.tagName ?? "";
+      const isEditable =
+        target?.isContentEditable ||
+        tagName === "INPUT" ||
+        tagName === "TEXTAREA" ||
+        tagName === "SELECT";
+
+      if (isEditable) {
+        return;
+      }
+
       if (event.key === "ArrowLeft") {
         event.preventDefault();
         onPrev();

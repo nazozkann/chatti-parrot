@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { WordEntry } from "@/app/lib/data/word-groups";
 import { PronounceButton } from "@/app/vocabulary/_components/PronounceButton";
 import { VocabularyCards } from "@/app/vocabulary/_components/VocabularyCards";
+import { VocabularyExercise } from "@/app/vocabulary/_components/VocabularyExercise";
 
 type ViewMode = "cards" | "table";
 
@@ -16,6 +17,67 @@ export function VocabularyViewToggle({ words }: { words: WordEntry[] }) {
     const sanitized = trimmed.replace(/^[^A-Za-zÄÖÜäöüß]+/u, "");
     return sanitized.length > 0 ? sanitized : trimmed;
   };
+
+  const label = (value: string) => value.toLocaleUpperCase("en-US");
+
+  const renderTableView = () => (
+    <section className="rounded-2xl border border-[var(--color-line)] bg-[var(--color-bg)] shadow-sm">
+      <div className="overflow-x-auto">
+        <table className="min-w-full border-collapse text-sm">
+          <thead>
+            <tr className="text-left text-[var(--color-muted)] tracking-wide">
+              <th className="border-b border-[var(--color-line)] px-6 py-4">
+                {label("German")}
+              </th>
+              <th className="border-b border-[var(--color-line)] px-6 py-4">
+                {label("English")}
+              </th>
+              <th className="border-b border-[var(--color-line)] px-6 py-4">
+                {label("Turkish")}
+              </th>
+              <th className="border-b border-[var(--color-line)] px-6 py-4">
+                {label("Example Sentence")}
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[var(--color-line)]">
+            {words.map((word) => (
+              <tr key={word.id} className="align-top">
+                <td className="px-6 py-4 text-[var(--color-fg)]">
+                  <div className="flex items-center gap-2 font-medium">
+                    <span className="break-words">{word.de}</span>
+                    <PronounceButton word={pronounceValue(word.de)} />
+                  </div>
+                  {word.plural && (
+                    <div className="mt-1 text-xs text-[var(--color-muted)]">
+                      {label("Plural")}: {word.plural}
+                    </div>
+                  )}
+                </td>
+                <td className="px-6 py-4 text-[var(--color-muted)]">
+                  {word.en ?? "—"}
+                </td>
+                <td className="px-6 py-4 text-[var(--color-muted)]">
+                  {word.tr ?? "—"}
+                </td>
+                <td className="px-6 py-4 text-[var(--color-muted)]">
+                  {word.examples.length > 0 ? (
+                    <ul className="space-y-2">
+                      {word.examples.map((example, index) => (
+                        <li key={index}>{example}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <span>—</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
 
   return (
     <div className="rounded-3xl border border-[var(--color-line)] bg-[var(--color-surface)] p-6 space-y-6">
@@ -52,50 +114,15 @@ export function VocabularyViewToggle({ words }: { words: WordEntry[] }) {
         </p>
       </div>
 
-      {mode === "cards" ? (
-        <VocabularyCards words={words} />
-      ) : (
-        <div className="mt-2 overflow-x-auto">
-          <table className="min-w-full border-collapse text-sm">
-            <thead>
-              <tr className="text-left text-[var(--color-muted)] uppercase tracking-wide">
-                <th className="border-b border-[var(--color-line)] pb-3 pr-6">German</th>
-                <th className="border-b border-[var(--color-line)] pb-3 pr-6">English</th>
-                <th className="border-b border-[var(--color-line)] pb-3 pr-6">Turkish</th>
-                <th className="border-b border-[var(--color-line)] pb-3">Example Sentence</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--color-line)]">
-              {words.map((word) => (
-                <tr key={word.id} className="align-top">
-                  <td className="py-4 pr-6 font-medium max-w-[16rem] text-[var(--color-fg)]">
-                    <div className="flex items-center gap-2">
-                      <span className="break-words">{word.de}</span>
-                      <PronounceButton word={pronounceValue(word.de)} />
-                    </div>
-                    {word.plural && (
-                      <div className="text-xs text-[var(--color-muted)]">Plural: {word.plural}</div>
-                    )}
-                  </td>
-                  <td className="py-4 pr-6 text-[var(--color-muted)]">{word.en ?? "—"}</td>
-                  <td className="py-4 pr-6 text-[var(--color-muted)]">{word.tr ?? "—"}</td>
-                  <td className="py-4 text-[var(--color-muted)]">
-                    {word.examples.length > 0 ? (
-                      <ul className="space-y-2">
-                        {word.examples.map((example, index) => (
-                          <li key={index}>{example}</li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <span>—</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <div>
+        {mode === "cards" ? (
+          <VocabularyCards words={words} />
+        ) : (
+          renderTableView()
+        )}
+      </div>
+
+      <VocabularyExercise words={words} />
     </div>
   );
 }

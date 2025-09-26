@@ -18,6 +18,8 @@ function getPronounceValue(raw: string) {
   return sanitized.length > 0 ? sanitized : trimmed;
 }
 
+const label = (value: string) => value.toLocaleUpperCase("en-US");
+
 export function VocabularyCards({ words }: { words: WordEntry[] }) {
   const [index, setIndex] = useState(0);
   const count = words.length;
@@ -79,27 +81,27 @@ export function VocabularyCards({ words }: { words: WordEntry[] }) {
               <PronounceButton word={getPronounceValue(currentWord.de)} />
             </div>
             {currentWord.plural && (
-              <p className="text-xs uppercase tracking-wide text-[var(--color-muted)]">
-                Plural: {currentWord.plural}
+              <p className="text-xs tracking-wide text-[var(--color-muted)]">
+                {label("Plural")}: {currentWord.plural}
               </p>
             )}
           </div>
           {currentWord.artikel && (
-            <span className="rounded-full border border-[var(--color-line)] px-3 py-1 text-xs uppercase tracking-wide text-[var(--color-muted)]">
-              {currentWord.artikel}
+            <span className="rounded-full border border-[var(--color-line)] px-3 py-1 text-xs tracking-wide text-[var(--color-muted)]">
+              {label(currentWord.artikel)}
             </span>
           )}
         </header>
 
         <div className="grid grid-cols-1 gap-3 text-sm text-[var(--color-muted)]">
           <div>
-            <p className="text-xs uppercase tracking-wide">English</p>
+            <p className="text-xs tracking-wide">{label("English")}</p>
             <p className="mt-1 text-base text-[var(--color-fg)]">
               {sanitizeDisplay(currentWord.en)}
             </p>
           </div>
           <div>
-            <p className="text-xs uppercase tracking-wide">Turkish</p>
+            <p className="text-xs tracking-wide">{label("Turkish")}</p>
             <p className="mt-1 text-base text-[var(--color-fg)]">
               {sanitizeDisplay(currentWord.tr)}
             </p>
@@ -107,7 +109,7 @@ export function VocabularyCards({ words }: { words: WordEntry[] }) {
         </div>
 
         <div className="text-sm text-[var(--color-muted)]">
-          <p className="text-xs uppercase tracking-wide">Example Sentence</p>
+          <p className="text-xs tracking-wide">{label("Example Sentence")}</p>
           <ul className="mt-2 space-y-2 text-[var(--color-fg)]">
             {exampleSentences.map((sentence, idx) => (
               <li key={idx}>{sentence}</li>
