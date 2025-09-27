@@ -3,14 +3,14 @@
 
 :root {
   /* renkler */
-  --color-bg: #252424; /* arka plan */
-  --color-fg: #f4f2f2; /* birincil yazı */
-  --color-muted: #6e6e6e; /* ikincil/metin */
-  --color-accent: #ff7f50; /* turuncu accent (CTA) */
-  --color-accent-soft: #ffb347; /* yumuşak turuncu */
-  --color-surface: #333232; /* kart/ yüzey */
-  --color-line: #3c3b3b; /* sınır/ayırıcı */
-  --color-hover: #3b3b3b; /* hover yüzeyi */
+  --color-bg: #252424;
+  --color-fg: #f4f2f2;
+  --color-muted: #6e6e6e;
+  --color-accent: #ff7f50;
+  --color-accent-soft: #ffb347;
+  --color-surface: #333232;
+  --color-line: #3c3b3b;
+  --color-hover: #3b3b3b;
 
   /* yazı tipleri (token) */
   --font-sans: Inter, system-ui, -apple-system, "Segoe UI", Roboto,

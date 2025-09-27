@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { RefreshCcw } from "lucide-react";
+import { Loader2, Mic, RefreshCcw } from "lucide-react";
 
 import type { WordEntry } from "@/app/lib/data/word-groups";
+import { showToast } from "@/app/components/CustomToast";
 
 const SPECIAL_CHARACTERS = ["ä", "ö", "ü", "ß"] as const;
 const ARTICLES = [
@@ -34,11 +35,56 @@ type FeedbackState = {
   reason: FeedbackReason;
 };
 
+type ResultType = "correct" | "incorrect";
+
 const VARIANT_MAP: Record<string, string[]> = {
   ä: ["ä", "ae", "a", "e"],
   ö: ["ö", "oe", "o"],
   ü: ["ü", "ue", "u"],
   ß: ["ß", "ss", "s"],
+};
+
+type SpeechRecognitionAlternative = {
+  transcript?: string;
+};
+
+type SpeechRecognitionResult = {
+  isFinal: boolean;
+  length: number;
+  [index: number]: SpeechRecognitionAlternative | undefined;
+};
+
+type SpeechRecognitionResultList = {
+  length: number;
+  [index: number]: SpeechRecognitionResult;
+};
+
+type SpeechRecognitionEvent = Event & {
+  resultIndex: number;
+  results: SpeechRecognitionResultList;
+};
+
+type SpeechRecognitionErrorEvent = Event & {
+  error: string;
+};
+
+type SpeechRecognitionInstance = EventTarget & {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  maxAlternatives: number;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+  addEventListener: typeof EventTarget.prototype.addEventListener;
+  removeEventListener: typeof EventTarget.prototype.removeEventListener;
+};
+
+type SpeechRecognitionConstructor = new () => SpeechRecognitionInstance;
+
+type SpeechRecognitionWindow = typeof window & {
+  SpeechRecognition?: SpeechRecognitionConstructor;
+  webkitSpeechRecognition?: SpeechRecognitionConstructor;
 };
 
 function escapeRegExp(value: string): string {
@@ -177,6 +223,33 @@ export function VocabularyExercise({ words }: { words: WordEntry[] }) {
   });
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  const speechBaseRef = useRef("");
+  const speechResultRef = useRef(false);
+  const skipNextSuccessRef = useRef(false);
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+
+  const pushSpeechError = useCallback((message: string) => {
+    showToast(message, "error");
+  }, []);
+
+  const recordAttempt = useCallback((wordId: string | null | undefined, outcome: ResultType) => {
+    if (!wordId) return;
+
+    void fetch("/api/user/progress", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ wordId, result: outcome }),
+    }).catch(() => {
+      /* silently ignore logging failures */
+    });
+  }, []);
+
+  const setGuessValue = useCallback((value: string) => {
+    setGuess(value);
+  }, []);
 
   const loadNextExercise = useCallback(
     (currentId?: string) => {
@@ -186,20 +259,21 @@ export function VocabularyExercise({ words }: { words: WordEntry[] }) {
       }
       const next = pickExercise(words, currentId);
       setExercise(next);
-      setGuess("");
+      setGuessValue("", false);
+      speechBaseRef.current = "";
+      skipNextSuccessRef.current = false;
       setHintCount(0);
       setFeedback({ tone: "neutral", reason: null });
       requestAnimationFrame(() => {
         inputRef.current?.focus();
       });
     },
-    [words]
+    [setGuessValue, words]
   );
 
   useEffect(() => {
     loadNextExercise();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [words.length]);
+  }, [loadNextExercise, words.length]);
 
   useEffect(() => {
     return () => {
@@ -212,6 +286,202 @@ export function VocabularyExercise({ words }: { words: WordEntry[] }) {
   const answerRaw = exercise?.word.de?.trim() ?? "";
   const answerWord = stripNumberPrefix(answerRaw);
   const answerLength = answerWord.length;
+
+  const evaluateGuess = useCallback(
+    (rawGuess: string) => {
+      if (!exercise) {
+        return;
+      }
+
+      const expectedRaw = answerWord;
+      const guessRaw = rawGuess.trim();
+      const wordId = exercise.word.id;
+
+      const expectedNormalized = normalize(expectedRaw);
+      const providedNormalized = normalize(guessRaw);
+
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+
+      if (expectedNormalized === providedNormalized) {
+        setGuessValue(guessRaw);
+        setFeedback({ tone: "correct", reason: null });
+        if (skipNextSuccessRef.current) {
+          skipNextSuccessRef.current = false;
+        } else {
+          recordAttempt(wordId, "correct");
+        }
+        timeoutRef.current = setTimeout(() => {
+          loadNextExercise(exercise.word.id);
+        }, 1000);
+        return;
+      }
+
+      const expectedLower = expectedRaw.toLowerCase();
+      const guessLower = guessRaw.toLowerCase();
+      const collapsedExpected = expectedLower.replace(/\s+/g, "");
+      const collapsedGuess = guessLower.replace(/\s+/g, "");
+
+      const spacingMismatch =
+        expectedLower !== guessLower &&
+        collapsedExpected === collapsedGuess &&
+        guessLower.includes(" ");
+
+      const expectedParts = splitArticle(expectedRaw);
+      const guessParts = splitArticle(guessRaw);
+      const expectedRestNormalized = normalize(expectedParts.rest);
+      const guessRestSource = guessParts.article ? guessParts.rest : guessRaw;
+      const guessRestNormalized = normalize(guessRestSource);
+      const articleMismatch = Boolean(
+        expectedParts.article &&
+          expectedRestNormalized.length > 0 &&
+          expectedRestNormalized === guessRestNormalized &&
+          expectedParts.article !== (guessParts.article ?? "")
+      );
+
+      const accentExpected = stripDiacritics(collapsedExpected);
+      const accentGuess = stripDiacritics(collapsedGuess);
+      const distance = levenshtein(accentExpected, accentGuess);
+
+      const variantPattern = buildVariantPattern(collapsedExpected);
+      const matchesVariants = variantPattern.test(collapsedGuess);
+
+      const almostCorrect =
+        spacingMismatch ||
+        articleMismatch ||
+        distance === 1 ||
+        (matchesVariants && accentExpected === accentGuess);
+
+      if (almostCorrect) {
+        setGuessValue(guessRaw);
+        setFeedback({ tone: "almost", reason: articleMismatch ? "article" : "minor" });
+        return;
+      }
+
+      setFeedback({ tone: "incorrect", reason: null });
+      skipNextSuccessRef.current = true;
+      setGuessValue(expectedRaw);
+      recordAttempt(wordId, "incorrect");
+      setHintCount(answerLength);
+      requestAnimationFrame(() => {
+        const input = inputRef.current;
+        if (input) {
+          input.focus();
+          input.setSelectionRange(answerLength, answerLength);
+        }
+      });
+    },
+    [answerLength, answerWord, exercise, loadNextExercise, recordAttempt, setGuessValue]
+  );
+
+  const evaluateGuessRef = useRef(evaluateGuess);
+
+  useEffect(() => {
+    evaluateGuessRef.current = evaluateGuess;
+  }, [evaluateGuess]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const speechWindow = window as SpeechRecognitionWindow;
+    const RecognitionConstructor =
+      speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
+
+    if (!RecognitionConstructor) {
+      return;
+    }
+
+    const recognition = new RecognitionConstructor();
+    recognition.lang = "de-DE";
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+
+    const handleResult = (event: SpeechRecognitionEvent) => {
+      let finalTranscript = "";
+      let interimTranscript = "";
+
+      for (let index = event.resultIndex; index < event.results.length; index++) {
+        const result = event.results[index];
+        const transcript = (result[0]?.transcript ?? "").trim();
+
+        if (result.isFinal) {
+          if (transcript.length > 0) {
+            finalTranscript = transcript;
+            speechResultRef.current = true;
+          }
+        } else if (transcript.length > 0) {
+          interimTranscript = transcript;
+          speechResultRef.current = true;
+        }
+      }
+
+      const combine = (value: string) => {
+        const base = speechBaseRef.current.trim();
+        const trimmed = value.trim();
+        if (!trimmed) {
+          return base;
+        }
+        if (!base) {
+          return trimmed;
+        }
+        return `${base} ${trimmed}`;
+      };
+
+      if (finalTranscript.length > 0) {
+        const merged = combine(finalTranscript);
+        speechBaseRef.current = merged;
+        setGuessValue(merged);
+        evaluateGuessRef.current?.(merged);
+        return;
+      }
+
+      if (interimTranscript.length > 0) {
+        const merged = combine(interimTranscript);
+        setGuessValue(merged);
+        return;
+      }
+    };
+
+    const handleError = (event: SpeechRecognitionErrorEvent) => {
+      speechResultRef.current = true;
+      if (event.error === "not-allowed") {
+        pushSpeechError("Mikrofona erişim reddedildi.");
+      } else if (event.error !== "aborted") {
+        pushSpeechError("Konuşma tanıma sırasında bir hata oluştu.");
+      }
+    };
+
+    const handleEnd = () => {
+      setIsListening(false);
+      if (!speechResultRef.current) {
+        pushSpeechError("Ses algılanamadı, lütfen tekrar deneyin.");
+      }
+    };
+
+    recognition.addEventListener("result", handleResult as EventListener);
+    recognition.addEventListener("error", handleError as EventListener);
+    recognition.addEventListener("end", handleEnd);
+
+    recognitionRef.current = recognition;
+    setSpeechSupported(true);
+
+    return () => {
+      recognition.removeEventListener("result", handleResult as EventListener);
+      recognition.removeEventListener("error", handleError as EventListener);
+      recognition.removeEventListener("end", handleEnd);
+      try {
+        recognition.stop();
+      } catch {
+        // ignore invalid state errors on cleanup
+      }
+      recognitionRef.current = null;
+    };
+  }, [pushSpeechError, setGuessValue]);
 
   const correctionContent = useMemo(() => {
     if (feedback.tone !== "almost" || answerWord.length === 0) {
@@ -284,81 +554,14 @@ export function VocabularyExercise({ words }: { words: WordEntry[] }) {
     setHintCount((current) => {
       const nextValue = Math.min(current + 1, answerLength);
       const nextGuess = answerWord.slice(0, nextValue);
-      setGuess(nextGuess);
+      setGuessValue(nextGuess);
       return nextValue;
     });
   };
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-
-    const expectedRaw = answerWord;
-    const guessRaw = guess.trim();
-
-    const expectedNormalized = normalize(expectedRaw);
-    const providedNormalized = normalize(guessRaw);
-
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-
-    if (expectedNormalized === providedNormalized) {
-      setFeedback({ tone: "correct", reason: null });
-      timeoutRef.current = setTimeout(() => {
-        loadNextExercise(exercise.word.id);
-      }, 1000);
-    } else {
-      const expectedLower = expectedRaw.toLowerCase();
-      const guessLower = guessRaw.toLowerCase();
-      const collapsedExpected = expectedLower.replace(/\s+/g, "");
-      const collapsedGuess = guessLower.replace(/\s+/g, "");
-
-      const spacingMismatch =
-        expectedLower !== guessLower &&
-        collapsedExpected === collapsedGuess &&
-        guessLower.includes(" ");
-
-      const expectedParts = splitArticle(expectedRaw);
-      const guessParts = splitArticle(guessRaw);
-      const expectedRestNormalized = normalize(expectedParts.rest);
-      const guessRestSource = guessParts.article ? guessParts.rest : guessRaw;
-      const guessRestNormalized = normalize(guessRestSource);
-      const articleMismatch = Boolean(
-        expectedParts.article &&
-          expectedRestNormalized.length > 0 &&
-          expectedRestNormalized === guessRestNormalized &&
-          expectedParts.article !== (guessParts.article ?? "")
-      );
-
-      const accentExpected = stripDiacritics(collapsedExpected);
-      const accentGuess = stripDiacritics(collapsedGuess);
-      const distance = levenshtein(accentExpected, accentGuess);
-
-      const variantPattern = buildVariantPattern(collapsedExpected);
-      const matchesVariants = variantPattern.test(collapsedGuess);
-
-      const almostCorrect =
-        spacingMismatch ||
-        articleMismatch ||
-        distance === 1 ||
-        (matchesVariants && accentExpected === accentGuess);
-
-      if (almostCorrect) {
-        setFeedback({ tone: "almost", reason: articleMismatch ? "article" : "minor" });
-      } else {
-        setFeedback({ tone: "incorrect", reason: null });
-        setGuess(answerWord);
-        setHintCount(answerLength);
-        requestAnimationFrame(() => {
-          const input = inputRef.current;
-          if (input) {
-            input.focus();
-            input.setSelectionRange(answerLength, answerLength);
-          }
-        });
-      }
-    }
+    evaluateGuess(guess);
   };
 
   const isHintAvailable = hintCount < answerLength;
@@ -377,7 +580,7 @@ export function VocabularyExercise({ words }: { words: WordEntry[] }) {
   const insertCharacter = (character: string) => {
     const input = inputRef.current;
     if (!input) {
-      setGuess((current) => current + character);
+      setGuessValue(guess + character);
       return;
     }
 
@@ -386,13 +589,40 @@ export function VocabularyExercise({ words }: { words: WordEntry[] }) {
     const value = input.value;
     const nextValue = value.slice(0, start) + character + value.slice(end);
 
-    setGuess(nextValue);
+    setGuessValue(nextValue);
 
     requestAnimationFrame(() => {
       input.focus();
       const nextPosition = start + character.length;
       input.setSelectionRange(nextPosition, nextPosition);
     });
+  };
+
+  const handleMicrophoneToggle = () => {
+    if (!speechSupported || !recognitionRef.current) {
+      pushSpeechError("Tarayıcınız konuşma tanımayı desteklemiyor.");
+      return;
+    }
+
+    const recognition = recognitionRef.current;
+
+    if (isListening) {
+      speechResultRef.current = true;
+      speechBaseRef.current = guess;
+      recognition.stop();
+      return;
+    }
+
+    speechResultRef.current = false;
+    speechBaseRef.current = guess;
+
+    try {
+      recognition.lang = "de-DE";
+      recognition.start();
+      setIsListening(true);
+    } catch {
+      pushSpeechError("Mikrofon başlatılamadı. Lütfen tekrar deneyin.");
+    }
   };
 
   return (
@@ -440,14 +670,28 @@ export function VocabularyExercise({ words }: { words: WordEntry[] }) {
       <form className="space-y-3" onSubmit={handleSubmit}>
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:gap-4">
           <div className="flex-1 space-y-2">
-            <input
-              ref={inputRef}
-              type="text"
-              value={guess}
-              onChange={(event) => setGuess(event.target.value)}
-              placeholder="Type the German word"
-              className="w-full rounded-full border border-[var(--color-line)] bg-[var(--color-bg)] px-4 py-2 text-sm text-[var(--color-fg)] focus:border-[var(--color-accent)] focus:outline-none"
-            />
+            <div className="relative">
+              <input
+                ref={inputRef}
+                type="text"
+                value={guess}
+                onChange={(event) => setGuessValue(event.target.value)}
+                placeholder="Type the German word"
+                className="w-full rounded-full border border-[var(--color-line)] bg-[var(--color-bg)] px-4 py-2 pr-12 text-sm text-[var(--color-fg)] focus:border-[var(--color-accent)] focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={handleMicrophoneToggle}
+                aria-label={isListening ? "Stop voice input" : "Start voice input"}
+                className="absolute inset-y-0 right-2 flex items-center justify-center rounded-full p-2 text-[var(--color-muted)] transition hover:text-[var(--color-accent)]"
+              >
+                {isListening ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-[var(--color-accent)]" />
+                ) : (
+                  <Mic className="h-4 w-4" />
+                )}
+              </button>
+            </div>
             <div className="flex flex-wrap gap-2">
               {SPECIAL_CHARACTERS.map((character) => (
                 <button
