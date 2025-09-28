@@ -7,6 +7,9 @@ import { dbConnect } from "@/app/lib/db/mongoose";
 import { User } from "@/app/models/User";
 import { UserWordStat } from "@/app/models/UserWordStat";
 import { Word } from "@/app/models/Word";
+import { WordGroup } from "@/app/models/WordGroup";
+import { WordGroupsSection } from "./WordGroupsSection";
+import type { LearnedWord, WordGroupStat } from "./types";
 
 const AVATAR_SYMBOL: Record<string, string> = {
   fox: "🦊",
@@ -48,16 +51,6 @@ function formatLanguages(list?: string[] | null) {
   return list.join(", ");
 }
 
-function getSuccessClasses(rate: number) {
-  if (rate >= 70) {
-    return { bar: "bg-emerald-500", text: "text-emerald-500" };
-  }
-  if (rate >= 30) {
-    return { bar: "bg-[var(--color-accent)]", text: "text-[var(--color-accent)]" };
-  }
-  return { bar: "bg-red-500", text: "text-red-500" };
-}
-
 export default async function ProfilePage() {
   const session = await getServerSession(authOptions);
 
@@ -73,13 +66,42 @@ export default async function ProfilePage() {
   }
 
   const stats = await UserWordStat.find({ user: session.user.id })
-    .populate({ path: "word", select: "de en tr artikel plural level", model: Word })
+    .populate({
+      path: "word",
+      select: "de en tr artikel plural level group",
+      model: Word,
+      populate: {
+        path: "group",
+        select: "name slug description level",
+        model: WordGroup,
+      },
+    })
     .lean();
 
-  const learnedWords = stats
+  const learnedWords: LearnedWord[] = stats
     .filter((entry) => entry.word && entry.totalAttempts > 0)
     .map((entry) => {
       const successRate = toPercent(entry.successCount, entry.totalAttempts);
+      const groupData =
+        entry.word.group &&
+        typeof entry.word.group === "object" &&
+        "_id" in entry.word.group
+          ? {
+              id: entry.word.group._id.toString(),
+              name: entry.word.group.name,
+              slug: entry.word.group.slug,
+              description: entry.word.group.description ?? null,
+              level: entry.word.group.level,
+            }
+          : {
+              id: entry.word.group?.toString() ?? "unknown",
+              name: "Bilinmeyen Grup",
+              slug: "",
+              description: null,
+              level: entry.word.level,
+            };
+      const lastAttemptDate =
+        entry.lastAttemptAt ?? entry.updatedAt ?? entry.createdAt;
       return {
         wordId: entry.word._id.toString(),
         de: entry.word.de,
@@ -91,10 +113,52 @@ export default async function ProfilePage() {
         totalAttempts: entry.totalAttempts,
         successCount: entry.successCount,
         successRate,
-        lastAttemptAt: entry.lastAttemptAt ?? entry.updatedAt ?? entry.createdAt,
+        lastAttemptAt: lastAttemptDate
+          ? new Date(lastAttemptDate).toISOString()
+          : null,
+        group: groupData,
       };
     })
-    .sort((a, b) => b.successRate - a.successRate || b.totalAttempts - a.totalAttempts);
+    .sort(
+      (a, b) =>
+        b.successRate - a.successRate || b.totalAttempts - a.totalAttempts
+    );
+
+  const groupMap = new Map<string, WordGroupStat>();
+
+  for (const word of learnedWords) {
+    const existing = groupMap.get(word.group.id);
+    if (existing) {
+      existing.words.push(word);
+      existing.totalAttempts += word.totalAttempts;
+      existing.successCount += word.successCount;
+      existing.averageRate = toPercent(
+        existing.successCount,
+        existing.totalAttempts
+      );
+      existing.wordCount += 1;
+    } else {
+      groupMap.set(word.group.id, {
+        id: word.group.id,
+        name: word.group.name,
+        slug: word.group.slug,
+        description: word.group.description,
+        level: word.group.level,
+        averageRate: toPercent(word.successCount, word.totalAttempts),
+        wordCount: 1,
+        totalAttempts: word.totalAttempts,
+        successCount: word.successCount,
+        words: [word],
+      });
+    }
+  }
+
+  const groupStats = Array.from(groupMap.values()).sort(
+    (a, b) =>
+      b.averageRate - a.averageRate ||
+      b.wordCount - a.wordCount ||
+      a.name.localeCompare(b.name)
+  );
 
   const avatarSymbol = getAvatarSymbol(userDoc.avatar);
   const displayName = buildDisplayName(userDoc);
@@ -111,8 +175,12 @@ export default async function ProfilePage() {
               {avatarSymbol}
             </div>
             <div>
-              <h1 className="text-3xl font-[var(--font-display)]">{displayName}</h1>
-              <p className="text-sm text-[var(--color-muted)]">{userDoc.email}</p>
+              <h1 className="text-3xl font-[var(--font-display)]">
+                {displayName}
+              </h1>
+              <p className="text-sm text-[var(--color-muted)]">
+                {userDoc.email}
+              </p>
               <p className="text-xs text-[var(--color-muted)]">
                 Kullanıcı Adı: {userDoc.username ?? "—"}
               </p>
@@ -120,13 +188,22 @@ export default async function ProfilePage() {
           </div>
           <div className="grid gap-3 text-sm text-[var(--color-muted)]">
             <div>
-              <span className="font-semibold text-[var(--color-fg)]">Öğrenilen Diller:</span> {languagesLearning}
+              <span className="font-semibold text-[var(--color-fg)]">
+                Öğrenilen Diller:
+              </span>{" "}
+              {languagesLearning}
             </div>
             <div>
-              <span className="font-semibold text-[var(--color-fg)]">Bilinen Diller:</span> {languagesKnown}
+              <span className="font-semibold text-[var(--color-fg)]">
+                Bilinen Diller:
+              </span>{" "}
+              {languagesKnown}
             </div>
             <div>
-              <span className="font-semibold text-[var(--color-fg)]">Roller:</span> {userDoc.roles?.length ? userDoc.roles.join(", ") : "student"}
+              <span className="font-semibold text-[var(--color-fg)]">
+                Roller:
+              </span>{" "}
+              {userDoc.roles?.length ? userDoc.roles.join(", ") : "student"}
             </div>
           </div>
         </section>
@@ -134,79 +211,25 @@ export default async function ProfilePage() {
         <section className="space-y-4 rounded-3xl border border-[var(--color-line)] bg-[var(--color-surface)] p-6">
           <header className="flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-[var(--font-display)]">Öğrenilen Kelimeler</h2>
+              <h2 className="text-2xl font-[var(--font-display)]">
+                Words Success
+              </h2>
               <p className="text-sm text-[var(--color-muted)]">
-                Egzersizlerde cevapladığın kelimeler ve doğruluk oranların.
+                Statistics of your word exercises
               </p>
             </div>
             <span className="rounded-full bg-[var(--color-bg)] px-3 py-1 text-xs text-[var(--color-muted)]">
-              {learnedWords.length} kelime
+              {groupStats.length} grup · {learnedWords.length} kelime
             </span>
           </header>
 
           {learnedWords.length === 0 ? (
             <p className="rounded-2xl border border-dashed border-[var(--color-line)] bg-[var(--color-bg)] p-6 text-sm text-[var(--color-muted)]">
-              Henüz hiçbir kelime egzersizi kaydedilmemiş. Başlamak için bir kelime egzersizi çöz.
+              Henüz hiçbir kelime egzersizi kaydedilmemiş. Başlamak için bir
+              kelime egzersizi çöz.
             </p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-[var(--color-line)] text-sm">
-                <thead className="bg-[var(--color-bg)] text-[var(--color-muted)]">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-medium">Kelime</th>
-                    <th className="px-4 py-3 text-left font-medium">Anlam</th>
-                    <th className="px-4 py-3 text-left font-medium">Deneme</th>
-                    <th className="px-4 py-3 text-left font-medium">Doğruluk</th>
-                    <th className="px-4 py-3 text-left font-medium">Son Çalışma</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--color-line)] text-[var(--color-fg)]">
-                  {learnedWords.map((word) => {
-                    const lastAttempt = word.lastAttemptAt
-                      ? new Date(word.lastAttemptAt).toLocaleDateString("tr-TR", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                        })
-                      : "—";
-                    const article = word.artikel ? `${word.artikel} ` : "";
-                    const { bar, text } = getSuccessClasses(word.successRate);
-                    return (
-                      <tr key={word.wordId} className="hover:bg-[var(--color-bg)]/60">
-                        <td className="px-4 py-3 font-semibold">
-                          {article}
-                          {word.de}
-                          {word.plural ? (
-                            <span className="ml-2 text-xs text-[var(--color-muted)]">pl. {word.plural}</span>
-                          ) : null}
-                        </td>
-                        <td className="px-4 py-3 text-[var(--color-muted)]">
-                          <div className="flex flex-col gap-1">
-                            {word.en ? <span>EN: {word.en}</span> : null}
-                            {word.tr ? <span>TR: {word.tr}</span> : null}
-                          </div>
-                        </td>
-                        <td className="px-4 py-3">
-                          {word.successCount} / {word.totalAttempts}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-2">
-                            <div className="h-2 w-20 rounded-full bg-[var(--color-line)]">
-                              <div
-                                className={`h-2 rounded-full ${bar}`}
-                                style={{ width: `${word.successRate}%` }}
-                              />
-                            </div>
-                            <span className={text}>{word.successRate}%</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-[var(--color-muted)]">{lastAttempt}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <WordGroupsSection groups={groupStats} />
           )}
         </section>
       </main>

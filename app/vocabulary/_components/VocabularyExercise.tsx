@@ -44,6 +44,15 @@ const VARIANT_MAP: Record<string, string[]> = {
   ß: ["ß", "ss", "s"],
 };
 
+type WordProgress = {
+  totalAttempts: number;
+  successCount: number;
+  successRate: number;
+  lastAttemptAt: string | null;
+};
+
+type WordStatMap = Record<string, WordProgress>;
+
 type SpeechRecognitionAlternative = {
   transcript?: string;
 };
@@ -158,6 +167,26 @@ function stripDiacritics(value: string): string {
     .replace(/ß/g, "ss");
 }
 
+function calculateSuccessRate(success: number, total: number): number {
+  if (!total || total <= 0) return 0;
+  return Math.round((success / total) * 100);
+}
+
+function computeWeight(stat?: WordProgress): number {
+  if (!stat) {
+    return 1.25;
+  }
+
+  const { totalAttempts, successRate } = stat;
+  if (totalAttempts < 3) {
+    return 1.5;
+  }
+
+  const deficit = Math.max(0, 90 - successRate);
+  const weight = 1 + deficit / 45;
+  return Number.isFinite(weight) && weight > 0 ? weight : 1;
+}
+
 function levenshtein(a: string, b: string): number {
   if (a === b) return 0;
   if (a.length === 0) return b.length;
@@ -191,6 +220,7 @@ function normalize(value: string): string {
 
 function pickExercise(
   words: WordEntry[],
+  stats: WordStatMap,
   previousId?: string
 ): ExerciseState | null {
   const eligible = words.filter((entry) => {
@@ -206,15 +236,37 @@ function pickExercise(
   const pool = eligible.filter((entry) => entry.id !== previousId);
   const candidates = pool.length > 0 ? pool : eligible;
 
-  const word = candidates[Math.floor(Math.random() * candidates.length)];
+  if (candidates.length === 0) {
+    return null;
+  }
 
-  return { word };
+  const weightedCandidates = candidates.map((entry) => ({
+    entry,
+    weight: computeWeight(stats[entry.id]),
+  }));
+
+  const totalWeight = weightedCandidates.reduce((sum, candidate) => sum + candidate.weight, 0);
+
+  if (!Number.isFinite(totalWeight) || totalWeight <= 0) {
+    const fallback = candidates[Math.floor(Math.random() * candidates.length)];
+    return { word: fallback };
+  }
+
+  let threshold = Math.random() * totalWeight;
+
+  for (const candidate of weightedCandidates) {
+    threshold -= candidate.weight;
+    if (threshold <= 0) {
+      return { word: candidate.entry };
+    }
+  }
+
+  return { word: weightedCandidates[weightedCandidates.length - 1].entry };
 }
 
 export function VocabularyExercise({ words }: { words: WordEntry[] }) {
-  const [exercise, setExercise] = useState<ExerciseState | null>(() =>
-    pickExercise(words)
-  );
+  const [wordStats, setWordStats] = useState<WordStatMap>({});
+  const [exercise, setExercise] = useState<ExerciseState | null>(null);
   const [guess, setGuess] = useState("");
   const [hintCount, setHintCount] = useState(0);
   const [feedback, setFeedback] = useState<FeedbackState>({
@@ -230,22 +282,119 @@ export function VocabularyExercise({ words }: { words: WordEntry[] }) {
   const [speechSupported, setSpeechSupported] = useState(false);
   const [isListening, setIsListening] = useState(false);
 
+  const wordIds = useMemo(() => words.map((word) => word.id), [words]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadStats() {
+      try {
+        const response = await fetch("/api/user/progress", {
+          credentials: "include",
+        });
+        if (!response.ok) {
+          return;
+        }
+
+        const data = (await response.json().catch(() => null)) as
+          | {
+              learnedWords?: Array<{
+                wordId?: string;
+                totalAttempts?: number;
+                successCount?: number;
+                successRate?: number;
+                lastAttemptAt?: string | null;
+              }>;
+            }
+          | null;
+
+        if (cancelled || !data?.learnedWords) {
+          return;
+        }
+
+        const ids = new Set(wordIds);
+        const nextStats: WordStatMap = {};
+
+        for (const entry of data.learnedWords) {
+          if (!entry?.wordId || !ids.has(entry.wordId)) {
+            continue;
+          }
+
+          const totalAttempts = Number(entry.totalAttempts ?? 0);
+          const successCount = Number(entry.successCount ?? 0);
+          const providedRate = typeof entry.successRate === "number" ? entry.successRate : null;
+          const successRate =
+            providedRate ?? calculateSuccessRate(successCount, totalAttempts);
+
+          nextStats[entry.wordId] = {
+            totalAttempts,
+            successCount,
+            successRate,
+            lastAttemptAt: entry.lastAttemptAt ? new Date(entry.lastAttemptAt).toISOString() : null,
+          };
+        }
+
+        if (!cancelled) {
+          setWordStats(nextStats);
+        }
+      } catch {
+        // silently ignore fetch issues, selection falls back to uniform randomness
+      }
+    }
+
+    loadStats();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [wordIds]);
+
   const pushSpeechError = useCallback((message: string) => {
     showToast(message, "error");
   }, []);
 
-  const recordAttempt = useCallback((wordId: string | null | undefined, outcome: ResultType) => {
-    if (!wordId) return;
+  const updateLocalStats = useCallback((wordId: string, outcome: ResultType) => {
+    setWordStats((prev) => {
+      const current = prev[wordId] ?? {
+        totalAttempts: 0,
+        successCount: 0,
+        successRate: 0,
+        lastAttemptAt: null,
+      };
 
-    void fetch("/api/user/progress", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ wordId, result: outcome }),
-    }).catch(() => {
-      /* silently ignore logging failures */
+      const totalAttempts = current.totalAttempts + 1;
+      const successCount = outcome === "correct" ? current.successCount + 1 : current.successCount;
+      const successRate = calculateSuccessRate(successCount, totalAttempts);
+
+      return {
+        ...prev,
+        [wordId]: {
+          totalAttempts,
+          successCount,
+          successRate,
+          lastAttemptAt: new Date().toISOString(),
+        },
+      };
     });
   }, []);
+
+  const recordAttempt = useCallback(
+    (wordId: string | null | undefined, outcome: ResultType) => {
+      if (!wordId) return;
+
+      updateLocalStats(wordId, outcome);
+
+      void fetch("/api/user/progress", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ wordId, result: outcome }),
+      }).catch(() => {
+        /* silently ignore logging failures */
+      });
+    },
+    [updateLocalStats]
+  );
 
   const setGuessValue = useCallback((value: string) => {
     setGuess(value);
@@ -257,9 +406,9 @@ export function VocabularyExercise({ words }: { words: WordEntry[] }) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
       }
-      const next = pickExercise(words, currentId);
+      const next = pickExercise(words, wordStats, currentId);
       setExercise(next);
-      setGuessValue("", false);
+      setGuessValue("");
       speechBaseRef.current = "";
       skipNextSuccessRef.current = false;
       setHintCount(0);
@@ -268,12 +417,20 @@ export function VocabularyExercise({ words }: { words: WordEntry[] }) {
         inputRef.current?.focus();
       });
     },
-    [setGuessValue, words]
+    [setGuessValue, wordStats, words]
   );
 
   useEffect(() => {
-    loadNextExercise();
-  }, [loadNextExercise, words.length]);
+    if (!exercise) {
+      setExercise(pickExercise(words, wordStats));
+      return;
+    }
+
+    const stillValid = words.some((word) => word.id === exercise.word.id);
+    if (!stillValid) {
+      setExercise(pickExercise(words, wordStats));
+    }
+  }, [exercise, wordStats, words]);
 
   useEffect(() => {
     return () => {

@@ -9,6 +9,13 @@ export const swaggerSpec = swaggerJsdoc({
       description: "Chatti Parrot proje API dokümantasyonu",
     },
     servers: [{ url: "/" }],
+    tags: [
+      { name: "Words", description: "Kelime ve kelime grubu yönetimi" },
+      {
+        name: "User Progress",
+        description: "Kullanıcıların kelime çalışma istatistikleri ve ilerleme kayıtları",
+      },
+    ],
     components: {
       schemas: {
         Word: {
@@ -225,6 +232,71 @@ export const swaggerSpec = swaggerJsdoc({
             "knownLanguages",
           ],
         },
+        UserProgressEntry: {
+          type: "object",
+          properties: {
+            wordId: { type: "string", example: "66fb2ab1b8a9a45c8a2b0e11" },
+            de: { type: "string", example: "Apfel" },
+            en: { type: "string", nullable: true, example: "apple" },
+            tr: { type: "string", nullable: true, example: "elma" },
+            artikel: {
+              type: "string",
+              nullable: true,
+              enum: ["der", "die", "das"],
+              example: "der",
+            },
+            plural: { type: "string", nullable: true, example: "Äpfel" },
+            level: {
+              type: "string",
+              enum: ["A1", "A2", "B1", "B2", "C1", "C2"],
+              example: "A1",
+            },
+            totalAttempts: { type: "integer", minimum: 0, example: 12 },
+            successCount: { type: "integer", minimum: 0, example: 7 },
+            successRate: { type: "integer", minimum: 0, maximum: 100, example: 58 },
+            lastAttemptAt: {
+              type: "string",
+              nullable: true,
+              format: "date-time",
+              example: "2024-10-12T09:42:11.120Z",
+            },
+          },
+          required: [
+            "wordId",
+            "de",
+            "level",
+            "totalAttempts",
+            "successCount",
+            "successRate",
+          ],
+        },
+        UserProgressPayload: {
+          type: "object",
+          properties: {
+            wordId: {
+              type: "string",
+              description: "Çalışılan kelimenin ObjectId değeri",
+              example: "66fb2ab1b8a9a45c8a2b0e11",
+            },
+            result: {
+              type: "string",
+              enum: ["correct", "incorrect"],
+              description: "Kullanıcının verdiği cevap sonucu",
+              example: "correct",
+            },
+          },
+          required: ["wordId", "result"],
+        },
+        UserProgressResponse: {
+          type: "object",
+          properties: {
+            learnedWords: {
+              type: "array",
+              items: { $ref: "#/components/schemas/UserProgressEntry" },
+            },
+          },
+          required: ["learnedWords"],
+        },
         Error: {
           type: "object",
           properties: {
@@ -246,6 +318,20 @@ export const swaggerSpec = swaggerJsdoc({
                     error: "Invalid payload",
                     details: { de: "Required" },
                   },
+                },
+              },
+            },
+          },
+        },
+        Unauthorized: {
+          description: "Oturum doğrulanamadı (401)",
+          content: {
+            "application/json": {
+              schema: { $ref: "#/components/schemas/Error" },
+              examples: {
+                unauthenticated: {
+                  summary: "Kullanıcı oturum açmamış",
+                  value: { error: "Unauthorized", details: null },
                 },
               },
             },

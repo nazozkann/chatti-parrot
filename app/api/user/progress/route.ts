@@ -11,6 +11,46 @@ type ResultType = "correct" | "incorrect";
 
 const VALID_RESULTS = new Set<ResultType>(["correct", "incorrect"]);
 
+/**
+ * @openapi
+ * /api/user/progress:
+ *   post:
+ *     summary: Kelime çalışma sonucunu kaydet
+ *     description: Kullanıcının bir kelime alıştırmasındaki sonucunu kaydeder ve istatistikleri günceller.
+ *     tags: [User Progress]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema: { $ref: '#/components/schemas/UserProgressPayload' }
+ *     responses:
+ *       200:
+ *         description: Kayıt başarılı
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 ok:
+ *                   type: boolean
+ *                   example: true
+ *               required: [ok]
+ *       400:
+ *         $ref: '#/components/responses/BadRequest'
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       404:
+ *         description: Kelime bulunamadı
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/Error' }
+ *             examples:
+ *               missingWord:
+ *                 summary: Kelime kaydı yok
+ *                 value: { error: 'Word not found', details: null }
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -63,6 +103,24 @@ export async function POST(request: Request) {
   }
 }
 
+/**
+ * @openapi
+ * /api/user/progress:
+ *   get:
+ *     summary: Kullanıcının kelime ilerlemesini getir
+ *     description: Oturum açmış kullanıcının çalıştığı kelimeler ve başarı oranlarını listeler.
+ *     tags: [User Progress]
+ *     responses:
+ *       200:
+ *         description: Başarılı
+ *         content:
+ *           application/json:
+ *             schema: { $ref: '#/components/schemas/UserProgressResponse' }
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       500:
+ *         $ref: '#/components/responses/ServerError'
+ */
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
