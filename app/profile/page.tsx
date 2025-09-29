@@ -10,6 +10,7 @@ import { Word } from "@/app/models/Word";
 import { WordGroup } from "@/app/models/WordGroup";
 import { WordGroupsSection } from "./WordGroupsSection";
 import type { LearnedWord, WordGroupStat } from "./types";
+import PenguinAnimation from "@/app/components/animations/PenguinAnimation";
 
 const AVATAR_SYMBOL: Record<string, string> = {
   fox: "🦊",
@@ -171,9 +172,10 @@ export default async function ProfilePage() {
       <main className="flex flex-col gap-10 p-6 md:p-10">
         <section className="flex flex-col gap-6 rounded-3xl border border-[var(--color-line)] bg-[var(--color-surface)] p-6 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-[#ffb347] via-[#ff7f50] to-[#ff5b25] text-3xl">
-              {avatarSymbol}
+            <div className="flex h-28 w-28 overflow-hidden items-center justify-center rounded-full bg-gradient-to-br from-[#ffb347] via-[#ff7f50] to-[#ff5b25] text-3xl">
+              <PenguinAnimation className="w-44 h-44 mt-16" />
             </div>
+            <div></div>
             <div>
               <h1 className="text-3xl font-[var(--font-display)]">
                 {displayName}
