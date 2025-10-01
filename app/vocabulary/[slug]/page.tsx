@@ -8,9 +8,10 @@ import { VocabularyViewToggle } from "@/app/vocabulary/_components/VocabularyVie
 export default async function VocabularyGroupPage({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;
 }) {
-  const group = await getWordGroupBySlug(params.slug);
+  const { slug } = await params;
+  const group = await getWordGroupBySlug(slug);
 
   if (!group) {
     notFound();
