@@ -104,8 +104,15 @@ export default function AiChatPage() {
           .catch(() => ({ error: "", detail: "" }))) as {
           error?: string;
           detail?: string;
+          hint?: string;
+          status?: number;
         };
-        const message = [errorPayload.error, errorPayload.detail]
+        const message = [
+          errorPayload.error,
+          errorPayload.detail,
+          errorPayload.hint,
+          errorPayload.status ? `Kod: ${errorPayload.status}` : "",
+        ]
           .filter(Boolean)
           .join(" — ")
           .trim();
