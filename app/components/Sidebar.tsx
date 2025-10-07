@@ -1,20 +1,29 @@
 export type SidebarMenuItem = {
   label: string;
   href: string;
+  icon: string;
 };
 
 export const SIDEBAR_MENU_ITEMS: SidebarMenuItem[] = [
-  { label: "Timeline", href: "/timeline" },
-  { label: "Vocabulary", href: "/vocabulary" },
-  { label: "Grammar Exercises", href: "/grammar-exercises" },
-  { label: "Reading", href: "/reading" },
-  { label: "Speaking", href: "/speaking" },
-  { label: "Listening", href: "/listening" },
-  { label: "Writing", href: "/writing" },
-  { label: "Games", href: "/games" },
-  { label: "AI Chat", href: "/ai-chat" },
-  { label: "Community", href: "/community" },
-  { label: "Profile", href: "/profile" },
+  { label: "Timeline", href: "/timeline", icon: "/icons/vocab-icon.svg" },
+  {
+    label: "Vocabulary",
+    href: "/vocabulary",
+    icon: "/icons/vocab-icon.svg",
+  },
+  {
+    label: "Grammar Exercises",
+    href: "/grammar-exercises",
+    icon: "/icons/grammer-icon.svg",
+  },
+  { label: "Reading", href: "/reading", icon: "/icons/reading-icon.svg" },
+  { label: "Speaking", href: "/speaking", icon: "/icons/vocab-icon.svg" },
+  { label: "Listening", href: "/listening", icon: "/icons/vocab-icon.svg" },
+  { label: "Writing", href: "/writing", icon: "/icons/vocab-icon.svg" },
+  { label: "Games", href: "/games", icon: "/icons/vocab-icon.svg" },
+  { label: "AI Chat", href: "/ai-chat", icon: "/icons/vocab-icon.svg" },
+  { label: "Community", href: "/community", icon: "/icons/vocab-icon.svg" },
+  { label: "Profile", href: "/profile", icon: "/icons/vocab-icon.svg" },
 ];
 
 export function Sidebar() {
@@ -35,6 +44,11 @@ export function Sidebar() {
                 className="flex items-center justify-between rounded-xl bg-white/5 px-4 py-3 text-sm font-medium transition hover:bg-white/10"
                 href={item.href}
               >
+                <img
+                  src={item.icon}
+                  alt={`${item.label} icon`}
+                  className="h-8 w-8 object-contain opacity-90"
+                />
                 <span>{item.label}</span>
               </a>
             </li>
