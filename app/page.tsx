@@ -170,7 +170,7 @@ export default function Home() {
   const avatarSymbol = getAvatarSymbol(profile?.avatar);
 
   return (
-    <div className="min-h-screen bg-[var(--color-bg)] text-[var(--color-fg)] grid md:grid-cols-[260px_1fr]">
+    <div className="min-h-screen bg-[var(--color-bg)] text-[var(--color-fg)] grid md:grid-cols-[80px_1fr] lg:grid-cols-[16rem_1fr]">
       <Sidebar />
 
       <main className="flex flex-col gap-10 p-6 md:p-10">

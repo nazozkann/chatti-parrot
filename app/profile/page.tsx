@@ -167,7 +167,7 @@ export default async function ProfilePage() {
   const languagesKnown = formatLanguages(userDoc.knownLanguages);
 
   return (
-    <div className="min-h-screen grid md:grid-cols-[260px_1fr] bg-[var(--color-bg)] text-[var(--color-fg)]">
+    <div className="min-h-screen grid md:grid-cols-[80px_1fr] lg:grid-cols-[16rem_1fr] bg-[var(--color-bg)] text-[var(--color-fg)]">
       <Sidebar />
       <main className="flex flex-col gap-10 p-6 md:p-10">
         <section className="flex flex-col gap-6 rounded-3xl border border-[var(--color-line)] bg-[var(--color-surface)] p-6 md:flex-row md:items-center md:justify-between">

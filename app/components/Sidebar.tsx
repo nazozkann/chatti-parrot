@@ -1,11 +1,15 @@
+"use client";
 export type SidebarMenuItem = {
   label: string;
   href: string;
   icon: string;
 };
 
+import Image from "next/image";
+import { usePathname } from "next/navigation";
+
 export const SIDEBAR_MENU_ITEMS: SidebarMenuItem[] = [
-  { label: "Timeline", href: "/timeline", icon: "/icons/vocab-icon.svg" },
+  { label: "Timeline", href: "/timeline", icon: "/icons/timeline-icon.svg" },
   {
     label: "Vocabulary",
     href: "/vocabulary",
@@ -17,19 +21,20 @@ export const SIDEBAR_MENU_ITEMS: SidebarMenuItem[] = [
     icon: "/icons/grammer-icon.svg",
   },
   { label: "Reading", href: "/reading", icon: "/icons/reading-icon.svg" },
-  { label: "Speaking", href: "/speaking", icon: "/icons/vocab-icon.svg" },
-  { label: "Listening", href: "/listening", icon: "/icons/vocab-icon.svg" },
-  { label: "Writing", href: "/writing", icon: "/icons/vocab-icon.svg" },
-  { label: "Games", href: "/games", icon: "/icons/vocab-icon.svg" },
-  { label: "AI Chat", href: "/ai-chat", icon: "/icons/vocab-icon.svg" },
-  { label: "Community", href: "/community", icon: "/icons/vocab-icon.svg" },
-  { label: "Profile", href: "/profile", icon: "/icons/vocab-icon.svg" },
+  { label: "Speaking", href: "/speaking", icon: "/icons/speaking-icon.svg" },
+  { label: "Listening", href: "/listening", icon: "/icons/listening-icon.svg" },
+  { label: "Writing", href: "/writing", icon: "/icons/writing-icon.svg" },
+  { label: "Games", href: "/games", icon: "/icons/game-icon.svg" },
+  { label: "AI Chat", href: "/ai-chat", icon: "/icons/aichat-icon.svg" },
+  { label: "Community", href: "/community", icon: "/icons/community-icon.svg" },
+  { label: "Profile", href: "/profile", icon: "/icons/profile-icon.svg" },
 ];
 
 export function Sidebar() {
+  const pathname = usePathname();
   return (
-    <aside className="hidden md:flex flex-col gap-8 border-r border-[var(--color-line)] bg-gradient-to-br from-[#252424] via-[#333232] to-[#ff7f50] p-8 text-[var(--color-fg)]">
-      <div className="space-y-1">
+    <aside className="hidden md:flex md:w-20 md:flex-col lg:w-64 gap-8 border-r border-[var(--color-line)] bg-gradient-to-br from-[#252424] via-[#333232] to-[#ff7f50] md:items-stretch lg:items-stretch md:overflow-visible md:p-4 lg:p-8 text-[var(--color-fg)]">
+      <div className="hidden space-y-1 lg:block">
         <p className="text-sm uppercase tracking-wide text-white/70">
           Chattı Parrot
         </p>
@@ -38,33 +43,35 @@ export function Sidebar() {
 
       <nav>
         <ul className="space-y-2">
-          {SIDEBAR_MENU_ITEMS.map((item) => (
-            <li key={item.label}>
-              <a
-                className="flex items-center justify-between rounded-xl bg-white/5 px-4 py-3 text-sm font-medium transition hover:bg-white/10"
-                href={item.href}
+          {SIDEBAR_MENU_ITEMS.map((item) => {
+            const isActive = pathname === item.href;
+            return (
+              <li
+                className="group flex items-center gap-4 md:relative md:justify-center lg:justify-start md:gap-0"
+                key={item.label}
               >
-                <img
-                  src={item.icon}
-                  alt={`${item.label} icon`}
-                  className="h-8 w-8 object-contain opacity-90"
-                />
-                <span>{item.label}</span>
-              </a>
-            </li>
-          ))}
+                <a
+                  className={`flex items-center justify-between rounded-xl px-2 py-3 text-sm font-medium md:justify-center md:px-2 md:py-2 lg:justify-between lg:px-2 lg:py-3 ${
+                    isActive ? "bg-white/8" : ""
+                  }`}
+                  href={item.href}
+                >
+                  <Image
+                    src={item.icon}
+                    alt={`${item.label} icon`}
+                    width={8}
+                    height={8}
+                    className="h-8 w-8 object-contain opacity-90"
+                  />
+                  <span className="whitespace-nowrap text-[14px] opacity-0 transition-all duration-200 group-hover:opacity-100 md:absolute md:left-full md:top-1/2 md:-translate-y-1/2 md:ml-3 md:rounded-full md:bg-white/20 md:px-3 md:py-1 md:text-white md:shadow-lg md:z-20 md:pointer-events-none lg:static lg:ml-3 lg:translate-y-0 lg:bg-transparent lg:px-0 lg:py-0 lg:text-inherit lg:shadow-none lg:opacity-100 lg:pointer-events-auto">
+                    {item.label}
+                  </span>
+                </a>
+              </li>
+            );
+          })}
         </ul>
       </nav>
-
-      <div className="mt-auto space-y-3 rounded-2xl bg-white/10 p-4 text-sm">
-        <p className="font-semibold">Need a quick win?</p>
-        <p className="text-white/80">
-          Launch a 5-minute review with Parrot AI to keep your streak glowing.
-        </p>
-        <button className="w-full rounded-lg bg-white text-[#252424] py-2 text-sm font-semibold transition hover:bg-[#ffe0d1]">
-          Start Lightning Review
-        </button>
-      </div>
     </aside>
   );
 }
