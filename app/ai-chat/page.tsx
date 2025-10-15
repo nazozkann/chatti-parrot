@@ -15,9 +15,7 @@ function createInitialMessages(level: ChatLevel): Message[] {
       id: crypto.randomUUID(),
       role: "assistant",
       content:
-        level === "A1" || level === "A2"
-          ? "Merhaba! Gemini ile Almanca pratik yapmaya hazır mısın? Kısa cümlelerle başlayalım. Bana gününün nasıl geçtiğini anlat!"
-          : "Selam! Gemini destekli Almanca sohbetimize hoş geldin. Bana bugün neler yaptığını kısaca anlat, oradan devam edelim!",
+        "Hallo! Ich bin dein Deutsch-Partner. Wie kann ich dir heute helfen?",
     },
   ];
 }

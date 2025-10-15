@@ -35,10 +35,24 @@ export function Sidebar() {
   return (
     <aside className="hidden md:flex md:w-20 md:flex-col lg:w-64 gap-8 border-r border-[var(--color-line)] bg-gradient-to-br from-[#252424] via-[#333232] to-[#ff7f50] md:items-stretch lg:items-stretch md:overflow-visible md:p-4 lg:p-8 text-[var(--color-fg)]">
       <div className="hidden space-y-1 lg:block">
-        <p className="text-sm uppercase tracking-wide text-white/70">
-          Chattı Parrot
-        </p>
-        <h2 className="text-2xl font-[var(--font-display)]">Language Hub</h2>
+        <div className="flex flex-col gap-1">
+          <div className="flex items-end gap-2">
+            <Image
+              src="/icons/app-icon.svg"
+              alt="Chattı Parrot Logo"
+              width={32}
+              height={32}
+            />
+            <p className="text-lg uppercase tracking-wide text-[var(--color-fg)] font-[700]">
+              Chattı Parrot
+            </p>
+          </div>
+          <div>
+            <h2 className="text-lg font-[var(--font-display)] text-[var(--color-text-secondary)]">
+              Language Hub
+            </h2>
+          </div>
+        </div>
       </div>
 
       <nav>
@@ -61,9 +75,9 @@ export function Sidebar() {
                     alt={`${item.label} icon`}
                     width={8}
                     height={8}
-                    className="h-8 w-8 object-contain opacity-90"
+                    className="h-8 w-8 flex object-contain opacity-90"
                   />
-                  <span className="whitespace-nowrap text-[14px] opacity-0 transition-all duration-200 group-hover:opacity-100 md:absolute md:left-full md:top-1/2 md:-translate-y-1/2 md:ml-3 md:rounded-full md:bg-white/20 md:px-3 md:py-1 md:text-white md:shadow-lg md:z-20 md:pointer-events-none lg:static lg:ml-3 lg:translate-y-0 lg:bg-transparent lg:px-0 lg:py-0 lg:text-inherit lg:shadow-none lg:opacity-100 lg:pointer-events-auto">
+                  <span className="whitespace-nowrap text-[14px] text-[var(--color-text-secondary)] opacity-0 transition-all duration-200 group-hover:opacity-100 md:absolute md:left-full md:top-1/2 md:-translate-y-1/2 md:ml-3 md:rounded-full md:bg-white/20 md:px-3 md:py-1 md:text-[var(--color-text-secondary)] md:shadow-lg md:z-20 md:pointer-events-none lg:static lg:ml-3 lg:translate-y-0 lg:bg-transparent lg:px-0 lg:py-0 lg:shadow-none lg:opacity-100 lg:pointer-events-auto">
                     {item.label}
                   </span>
                 </a>
